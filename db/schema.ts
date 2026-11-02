@@ -31,7 +31,7 @@ export const crawlState = sqliteTable('crawl_state', {
  leaseUntil:integer('lease_until').notNull().default(0), token:text('token'),
 });
 export const research = sqliteTable('research', {
- scope:text('scope').primaryKey(), query:text('query').notNull().default(''),terms:text('terms').notNull().default('[]'),
+ scope:text('scope').primaryKey(), provider:text('provider').notNull().default('OpenAlex'), query:text('query').notNull().default(''),terms:text('terms').notNull().default('[]'),
  papers:text('papers').notNull().default('[]'),paperCount:integer('paper_count'),mentionCount:integer('mention_count'),
  examined:integer('examined'),totalResults:integer('total_results'),searchedAt:text('searched_at'),lastAttemptAt:text('last_attempt_at'),error:text('error'),
 });

@@ -48,3 +48,8 @@ test('shared lease blocks overlapping searches and releases after failures',asyn
  const {db}=fixture();let now=100000,release,started;const wait=new Promise(r=>release=r),entered=new Promise(r=>started=r);const service=createResearchService(db,schema,{clock:()=>now,inspect:async()=>{started();await wait;return result;}});
  const first=service.search(group);await entered;await assert.rejects(service.search(group),{status:429});release();await first;now+=2000;await service.search(group);
 });
+
+test('a rate-limited OpenAlex query falls back to Europe PMC and labels its actual coverage',async()=>{
+ const result=await inspectResearch(['CIFAR-10'],{fetcher:async url=>new URL(url).hostname==='api.openalex.org'?new Response('limited',{status:429}):Response.json({hitCount:1000,resultList:{result:[{id:'123',source:'MED',title:'Visual learning',doi:'10.1/example',pubYear:'2025',abstractText:'<h4>Results</h4> We evaluate our model on CIFAR-10.'}]}})});
+ assert.equal(result.provider,'Europe PMC');assert.equal(result.totalResults,1000);assert.equal(result.papers.length,1);assert.equal(result.papers[0].basis,'use_evidence');assert.equal(result.papers[0].url,'https://doi.org/10.1/example');
+});

@@ -1,0 +1,1 @@
+ALTER TABLE `research` ADD `provider` text DEFAULT 'OpenAlex' NOT NULL;
