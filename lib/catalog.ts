@@ -16,7 +16,7 @@ export async function stepRun(id:string,limit=20){
  const db=getDb();const [run]=await db.select().from(runs).where(eq(runs.id,id));if(!run)throw new Error('Crawl not found');if(run.status!=='running')return run;
  // Atomic lease prevents duplicate browser tabs from processing the same queue.
  const now=Date.now();
- const claimed=await db.update(runs).set({lease:now+90000}).where(and(eq(runs.id,id),lte(runs.lease,now))).returning();
+ const claimed=await db.update(runs).set({lease:now+90000}).where(and(eq(runs.id,id),eq(runs.status,'running'),eq(runs.processed,run.processed),lte(runs.lease,now))).returning();
  if(!claimed.length)return run;
  const queue=JSON.parse(run.queue) as {url:string;depth:number}[],seen=new Set<string>(JSON.parse(run.seen)),logs=JSON.parse(run.logs);
  let processed=run.processed,added=run.added;
