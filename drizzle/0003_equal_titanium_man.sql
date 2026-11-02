@@ -1,0 +1,1 @@
+ALTER TABLE `datasets` ADD `usage_status` text DEFAULT 'new' NOT NULL;

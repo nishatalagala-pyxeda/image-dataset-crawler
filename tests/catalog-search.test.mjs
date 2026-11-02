@@ -78,3 +78,10 @@ test('domain inference handles benchmark names and avoids mistaking the LEAF fra
  assert(JSON.parse(inferDomains({name:'Alzheimer_MRI',subject:'Classification'}).domains).includes('medical'));
  assert(!JSON.parse(inferDomains({name:'FEMNIST',subject:'Part of the LEAF benchmark. Handwritten digits.'}).domains).includes('biodiversity'));
 });
+
+test('usage filters combine with metadata filters and exports carry the shared status',()=>{
+ const data=rows.map((r,i)=>({...r,usageStatus:i===0?'partially_used':i===1?'used':'new'}));
+ const selected=filterDatasets(data,{usageStatus:'partially_used',status:'matched',domain:'biodiversity',maxImages:'500'});
+ assert.deepEqual(selected.map(r=>r.id),['birds']);assert(csv(selected).includes('usageStatus'));assert(csv(selected).includes('partially_used'));
+ assert.deepEqual(filterDatasets(data,{usageStatus:'used'}).map(r=>r.id),['leaves']);assert.equal(filterDatasets(data,{usageStatus:'new'}).length,3);
+});

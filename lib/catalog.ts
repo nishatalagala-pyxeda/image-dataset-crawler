@@ -8,3 +8,4 @@ export const latestRun=()=>service().latestRun();
 export const discoveryStats=()=>service().discoveryStats();
 export const startRun=(urls:string[],limit=20,mode='discover')=>service().startRun(urls,limit,mode);
 export const stepRun=(id:string)=>service().stepRun(id);
+export const updateUsage=async(id:string,usageStatus:string)=>displayRecord(await service().updateUsage(id,usageStatus));

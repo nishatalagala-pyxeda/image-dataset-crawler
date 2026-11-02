@@ -137,3 +137,34 @@ test('batch hosting-date collection resumes across budgets, changes only dates a
  const calls=requested.length;run=await service.startRun([],1,'dates');assert.equal(run.status,'complete');assert.equal(requested.length,calls);
  const dateRequests=requested.filter(url=>new URL(url).searchParams.getAll('expand[]').length===1);assert.equal(dateRequests.length,2);assert(new URL(dateRequests[1]).searchParams.has('cursor'));
 });
+
+test('usage starts New, persists through service recreation and refreshes, and accepts only known statuses',async()=>{
+ const {db}=fixture();let now=1000;
+ const make=()=>createCatalogService(db,schema,{defaults:[root],clock:()=>now++,inspect:async url=>jsonPage(url,[dataset('usage')])});
+ let service=make(),run=await service.startRun([],1,'discover');await service.stepRun(run.id);
+ const original=(await service.catalog())[0];assert.equal(original.usageStatus,'new');
+ for(const status of ['partially_used','used','new']){await service.updateUsage(original.id,status);service=make();assert.equal((await service.catalog())[0].usageStatus,status);}
+ await assert.rejects(service.updateUsage(original.id,'invalid'),{status:400});
+ await assert.rejects(service.updateUsage('missing','used'),{status:404});
+ await service.updateUsage(original.id,'used');
+ run=await service.startRun([],1,'refresh');await service.stepRun(run.id);
+ assert.equal((await service.catalog())[0].usageStatus,'used');assert.equal((await service.catalog())[0].foundAt,original.foundAt);
+});
+
+test('a usage change made while a crawl is inspecting a page survives its metadata update',async()=>{
+ const {db}=fixture();let now=1000;const service=createCatalogService(db,schema,{defaults:[root],clock:()=>now++,inspect:async url=>jsonPage(url,[dataset('shared')])});
+ let run=await service.startRun([],1,'discover');await service.stepRun(run.id);const original=(await service.catalog())[0];
+ let release,started;const waiting=new Promise(resolve=>release=resolve),inspecting=new Promise(resolve=>started=resolve);
+ const refreshing=createCatalogService(db,schema,{clock:()=>now++,inspect:async url=>{started();await waiting;return jsonPage(url,dataset('shared',90));}});
+ run=await refreshing.startRun([],1,'refresh');const step=refreshing.stepRun(run.id);await inspecting;
+ await service.updateUsage(original.id,'partially_used');release();await step;
+ const record=(await service.catalog())[0];assert.equal(record.usageStatus,'partially_used');assert.equal(record.images,90);
+});
+
+test('usage migration initializes existing datasets to New without altering their metadata',()=>{
+ const sqlite=new DatabaseSync(':memory:');const files=readdirSync(new URL('../drizzle/',import.meta.url)).filter(x=>x.endsWith('.sql')).sort();
+ for(const file of files.slice(0,-1))sqlite.exec(readFileSync(new URL('../drizzle/'+file,import.meta.url),'utf8'));
+ sqlite.exec("INSERT INTO datasets (id,name,subject,url,source,evidence,status,found_at,crawled_at,last_success_at) VALUES ('old','Old dataset','Birds','https://example.org','Publisher','Evidence','matched','2020-01-01','2026-01-01','2026-01-01')");
+ sqlite.exec(readFileSync(new URL('../drizzle/'+files.at(-1),import.meta.url),'utf8'));
+ const row=sqlite.prepare('SELECT * FROM datasets').get();assert.equal(row.usage_status,'new');assert.equal(row.name,'Old dataset');assert.equal(row.found_at,'2020-01-01');sqlite.close();
+});
