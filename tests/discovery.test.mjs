@@ -96,3 +96,13 @@ test('refresh retains an existing identifier when a single publisher page change
  run=await revised.startRun([],1,'refresh');run=await revised.stepRun(run.id);
  const rows=await revised.catalog();assert.equal(rows.length,1);assert.equal(rows[0].id,old.id);assert.equal(rows[0].foundAt,old.foundAt);assert.equal(rows[0].images,80);assert.equal(run.updated,1);assert.equal(run.added,0);
 });
+
+test('directory pagination does not starve other websites or newly supplied starting pages',async()=>{
+ const {db}=fixture();let now=1000;const calls=[];
+ const service=createCatalogService(db,schema,{defaults:[root,'https://example.org/directory'],clock:()=>now++,inspect:async url=>{calls.push(url);return url===root?jsonPage(url,[dataset('alpha')],next):{url,type:'text/html',body:'Dataset directory'};}});
+ let run=await service.startRun([],1,'discover');await service.stepRun(run.id);
+ run=await service.startRun([],1,'discover');await service.stepRun(run.id);
+ assert.equal(calls[1],'https://example.org/directory');
+ run=await service.startRun(['https://other.example.org/datasets'],1,'discover');await service.stepRun(run.id);
+ assert.equal(calls[2],'https://other.example.org/datasets');
+});
