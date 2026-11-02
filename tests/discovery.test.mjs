@@ -162,9 +162,24 @@ test('a usage change made while a crawl is inspecting a page survives its metada
 });
 
 test('usage migration initializes existing datasets to New without altering their metadata',()=>{
- const sqlite=new DatabaseSync(':memory:');const files=readdirSync(new URL('../drizzle/',import.meta.url)).filter(x=>x.endsWith('.sql')).sort();
+ const sqlite=new DatabaseSync(':memory:');const files=readdirSync(new URL('../drizzle/',import.meta.url)).filter(x=>x.endsWith('.sql')&&x<'0004').sort();
  for(const file of files.slice(0,-1))sqlite.exec(readFileSync(new URL('../drizzle/'+file,import.meta.url),'utf8'));
  sqlite.exec("INSERT INTO datasets (id,name,subject,url,source,evidence,status,found_at,crawled_at,last_success_at) VALUES ('old','Old dataset','Birds','https://example.org','Publisher','Evidence','matched','2020-01-01','2026-01-01','2026-01-01')");
  sqlite.exec(readFileSync(new URL('../drizzle/'+files.at(-1),import.meta.url),'utf8'));
  const row=sqlite.prepare('SELECT * FROM datasets').get();assert.equal(row.usage_status,'new');assert.equal(row.name,'Old dataset');assert.equal(row.found_at,'2020-01-01');sqlite.close();
+});
+
+test('manual groups and exclusions persist through refresh, and usage applies to every listing',async()=>{
+ const {db}=fixture();let now=1000;
+ const service=createCatalogService(db,schema,{defaults:[root],clock:()=>now++,inspect:async url=>url===root?jsonPage(url,[dataset('alpha'),dataset('beta')]):jsonPage(url,dataset(url.includes('alpha')?'alpha':'beta'))});
+ let run=await service.startRun([],1,'discover');await service.stepRun(run.id);
+ const rows=await service.catalog();assert.equal((await service.groupedCatalog()).length,2);
+ await service.updateUsage(rows[0].id,'partially_used');const group=await service.mergeDatasets(rows.map(r=>r.id));
+ assert.equal(group.sourceCount,2);assert.equal(group.usageStatus,'partially_used');assert.equal((await service.catalog()).length,2);
+ await service.updateUsage(group.id,'used');assert((await service.catalog()).every(r=>r.usageStatus==='used'));
+ run=await service.startRun([],2,'refresh');await service.stepRun(run.id);assert.equal((await service.groupedCatalog()).length,1);
+ await service.separateSource(group.sources[1].id);assert.equal((await service.groupedCatalog()).length,2);assert((await service.catalog()).some(r=>r.groupKey.startsWith('separate:')));
+ await assert.rejects(service.mergeDatasets([rows[0].id,'missing']),{status:404});assert.equal((await service.groupedCatalog()).length,2);
+ await assert.rejects(service.mergeDatasets([rows[0].id,rows[0].id]),{status:400});
+ await assert.rejects(service.separateSource('missing'),{status:404});
 });

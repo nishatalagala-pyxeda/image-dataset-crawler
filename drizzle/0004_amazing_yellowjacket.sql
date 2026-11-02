@@ -1,0 +1,1 @@
+ALTER TABLE `datasets` ADD `group_key` text;

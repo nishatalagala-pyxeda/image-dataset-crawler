@@ -55,3 +55,13 @@ node node_modules/typescript/bin/tsc --noEmit
 Apply the local schema once to a fresh preview database, then apply subsequent migration files in order (including `0001_lush_sersi.sql` for discovery state and `0002_mighty_oracle.sql` for domain/publication metadata). Sites applies committed migrations to the separate hosted database during deployment. Future schema changes use `npm run db:generate` and new migrations.
 
 Crawls run on demand. There is no automatic schedule enabled. Production records are separate from local preview records. No API keys are required for the public sources.
+
+## Dataset deduplication
+
+The catalog automatically groups recognized benchmark aliases and informative normalized names with compatible documented counts. It applies to existing records immediately and future crawls. Matching uses titles, not descriptions that may mention a parent dataset; variants and conflicting counts remain separate. Automatic matching is conservative and cannot identify every mirror or renamed copy.
+
+Select 2–50 catalog records and use **Group selected datasets** for duplicates that need human judgment. Open a dataset to see every original source link, per-source counts, publication evidence and crawl dates. **Keep this listing separate** creates a persistent exclusion from automatic matching; the record can be manually grouped again. Manual groups and exclusions are stored in D1 and survive refreshes. No source records are deleted.
+
+Each group appears once in the table, filters and exports. Counts come from the primary listing and are never summed across mirrors; conflicting manual-group counts are flagged. Publisher listings with supported metadata are preferred. The group keeps its earliest discovery date, latest crawl date, and primary source publication date (or another known source date with its original provenance). Usage follows the most advanced existing status (Used, then Partially used, then New); subsequent changes apply to every source in the group. CSV includes all URLs and serialized source metadata; JSON includes the full source records. Source and text filters search all listings in a group.
+
+Run `node --test tests/crawler.test.mjs tests/discovery.test.mjs tests/catalog-search.test.mjs tests/dataset-groups.test.mjs` for the full suite. Apply `0003_equal_titanium_man.sql` and `0004_amazing_yellowjacket.sql` to older local databases for usage and group metadata.
