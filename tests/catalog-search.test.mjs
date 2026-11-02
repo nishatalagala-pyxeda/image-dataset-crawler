@@ -72,3 +72,9 @@ test('users can distinguish publication metadata from repository creation date p
  assert.deepEqual(filterDatasets(data,{dateAvailability:'published'}).map(r=>r.id),['leaves']);
  assert.deepEqual(filterDatasets(data,{dateAvailability:'repository'}).map(r=>r.id),['birds']);
 });
+
+test('domain inference handles benchmark names and avoids mistaking the LEAF framework for plant images',()=>{
+ assert(JSON.parse(inferDomains({name:'CUB_200_2011',subject:'Fine-grained image classification'}).domains).includes('biodiversity'));
+ assert(JSON.parse(inferDomains({name:'Alzheimer_MRI',subject:'Classification'}).domains).includes('medical'));
+ assert(!JSON.parse(inferDomains({name:'FEMNIST',subject:'Part of the LEAF benchmark. Handwritten digits.'}).domains).includes('biodiversity'));
+});

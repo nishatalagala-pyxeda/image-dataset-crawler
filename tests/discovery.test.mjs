@@ -13,6 +13,7 @@ function fixture(){
  const sqlite=new DatabaseSync(':memory:');
  for(const file of readdirSync(new URL('../drizzle/',import.meta.url)).filter(x=>x.endsWith('.sql')).sort())sqlite.exec(readFileSync(new URL('../drizzle/'+file,import.meta.url),'utf8'));
  const client={prepare(query){const stmt=sqlite.prepare(query);let params=[];return {bind(...p){params=p;return this;},async run(){const r=stmt.run(...params);return {success:true,meta:{changes:Number(r.changes),last_row_id:Number(r.lastInsertRowid)},results:[]};},async all(){return {results:stmt.all(...params),success:true};},async raw(){stmt.setReturnArrays(true);return stmt.all(...params);}};}};
+ client.batch=async statements=>{const out=[];for(const stmt of statements)out.push(await stmt.all());return out;};
  return {db:drizzle(client),sqlite};
 }
 const root=metadataURL('https://huggingface.co/api/datasets?filter=task_categories:image-classification&limit=1');
@@ -115,4 +116,24 @@ test('refresh adds hosted publication metadata without changing discovery dates 
  service=make();run=await service.startRun([],1,'refresh');await service.stepRun(run.id);
  let row=(await service.catalog())[0];assert.equal(row.publicationDate,'2020-06-01');assert.equal(row.publicationDateBasis,'repository_created');assert.equal(row.foundAt,foundAt);
  createdAt=undefined;run=await service.startRun([],1,'refresh');await service.stepRun(run.id);row=(await service.catalog())[0];assert.equal(row.publicationDate,'2020-06-01');assert.equal(row.foundAt,foundAt);
+});
+
+test('batch hosting-date collection resumes across budgets, changes only dates and never adds unknown datasets',async()=>{
+ const {db}=fixture();let now=1000;const requested=[];
+ const inspect=async url=>{
+  requested.push(url);const u=new URL(url),fields=u.searchParams.getAll('expand[]');
+  if(fields.length!==1)return jsonPage(url,[dataset('alpha'),dataset('beta')]);
+  if(u.searchParams.has('cursor'))return jsonPage(url,[{id:'fixture/beta',createdAt:'2022-01-01T00:00:00Z'}],root+'&cursor=unused');
+  return jsonPage(url,[{id:'fixture/alpha',createdAt:'2020-01-01T00:00:00Z'},{id:'fixture/unknown',createdAt:'2021-01-01T00:00:00Z'}],root+'&cursor=date-second');
+ };
+ const make=()=>createCatalogService(db,schema,{defaults:[root],clock:()=>now++,inspect});
+ let service=make(),run=await service.startRun([],1,'discover');await service.stepRun(run.id);
+ const before=await service.catalog(),frontierBefore=await service.discoveryStats();
+ run=await service.startRun([],1,'dates');run=await service.stepRun(run.id);assert.equal(run.updated,1);assert.equal(run.added,0);assert.equal(run.status,'complete');assert.equal(JSON.parse(run.queue).length,1);
+ service=make();run=await service.startRun([],1,'dates');run=await service.stepRun(run.id);assert.equal(run.updated,1);assert.equal(JSON.parse(run.queue).length,0);
+ const after=await service.catalog();assert.equal(after.length,2);assert(after.every(r=>r.publicationDate));
+ for(const old of before){const row=after.find(r=>r.id===old.id);assert.equal(row.foundAt,old.foundAt);assert.equal(row.crawledAt,old.crawledAt);assert.equal(row.images,old.images);assert.equal(row.categories,old.categories);}
+ assert.deepEqual(await service.discoveryStats(),frontierBefore);
+ const calls=requested.length;run=await service.startRun([],1,'dates');assert.equal(run.status,'complete');assert.equal(requested.length,calls);
+ const dateRequests=requested.filter(url=>new URL(url).searchParams.getAll('expand[]').length===1);assert.equal(dateRequests.length,2);assert(new URL(dateRequests[1]).searchParams.has('cursor'));
 });
