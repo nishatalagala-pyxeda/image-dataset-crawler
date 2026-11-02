@@ -1,6 +1,9 @@
 import { integer, sqliteTable, text } from 'drizzle-orm/sqlite-core';
 export const datasets = sqliteTable('datasets', {
  id:text('id').primaryKey(), name:text('name').notNull(), subject:text('subject').notNull(),
+ domains:text('domains').notNull().default('[]'), domainEvidence:text('domain_evidence'),
+ publicationDate:text('publication_date'), publicationDateSource:text('publication_date_source'),
+ publicationDateBasis:text('publication_date_basis'), publicationDateEvidence:text('publication_date_evidence'),
  categories:integer('categories'), images:integer('images'), url:text('url').notNull(),
  source:text('source').notNull(), evidence:text('evidence').notNull(), status:text('status').notNull(),
  foundAt:text('found_at').notNull(), crawledAt:text('crawled_at').notNull(),

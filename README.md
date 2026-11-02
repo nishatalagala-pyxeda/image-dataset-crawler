@@ -18,6 +18,14 @@ The catalog stores a generated name, image subject, category count, expected ima
 
 Click a dataset name for evidence. Use the source link to visit its dataset page. CSV and JSON buttons export the current search/filter results; `/api/export` and `/api/export?format=json` export the full persisted catalog.
 
+## Search the catalog
+
+Combine the **Domain** selector (including Biodiversity), an inclusive publication/hosting date range, and minimum/maximum image counts with text search, source filters, and match/review tabs. Domains are inferred from dataset names, descriptions and tags; a record can have multiple domains. Existing records receive inferred labels immediately without a new crawl. Keyword-based labels are explained in record details and are not publisher-verified taxonomy.
+
+Publication dates are separate from `foundAt` (first discovery) and `crawledAt` (latest crawl attempt). For HTML pages the crawler accepts explicit primary Dataset/Page JSON-LD `datePublished` or published/issued meta tags. It never treats paper citations, copyright years, modification dates, or crawl timestamps as publication dates. For Hugging Face it requests `createdAt` and labels this **Repository created**, with its source URL and evidence. Repository creation is a hosting-date proxy; it does not prove the original dataset release date or when an originally private repository became public. The **Date evidence** selector can exclude repository creation proxies. Missing/invalid dates stay unknown. Refresh existing records to collect available dates for older entries; a later page lacking that field does not erase a previously collected date.
+
+Active date ranges exclude records without dates; active image-count ranges exclude unknown image counts. Invalid ranges show validation feedback and return no results. Publication date sorting places unknowns last. CSV/JSON buttons export the currently filtered list and include domain labels, date provenance, and the separate crawl dates. `/api/export` supports the same query parameters: `domain`, `publishedFrom`, `publishedTo`, `dateAvailability` (`any`, `known`, `unknown`, `published`, `repository`), `minImages`, `maxImages`, `query`, `source`, `status`, and `sort`. Add `format=json` for JSON.
+
 ## Implementation
 
 - React / Vinext UI, Cloudflare Worker routes, D1 / Drizzle persistent records and crawl jobs.
@@ -40,10 +48,10 @@ npm run dev
 ```
 
 ```sh
-node --test tests/crawler.test.mjs tests/discovery.test.mjs
+node --test tests/crawler.test.mjs tests/discovery.test.mjs tests/catalog-search.test.mjs
 node node_modules/typescript/bin/tsc --noEmit
 ```
 
-Apply the local schema once to a fresh preview database, then apply subsequent migration files in order (including `0001_lush_sersi.sql` for discovery state). Sites applies committed migrations to the separate hosted database during deployment. Future schema changes use `npm run db:generate` and new migrations.
+Apply the local schema once to a fresh preview database, then apply subsequent migration files in order (including `0001_lush_sersi.sql` for discovery state and `0002_mighty_oracle.sql` for domain/publication metadata). Sites applies committed migrations to the separate hosted database during deployment. Future schema changes use `npm run db:generate` and new migrations.
 
 Crawls run on demand. There is no automatic schedule enabled. Production records are separate from local preview records. No API keys are required for the public sources.

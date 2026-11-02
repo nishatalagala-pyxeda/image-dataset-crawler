@@ -106,3 +106,13 @@ test('directory pagination does not starve other websites or newly supplied star
  run=await service.startRun(['https://other.example.org/datasets'],1,'discover');await service.stepRun(run.id);
  assert.equal(calls[2],'https://other.example.org/datasets');
 });
+
+test('refresh adds hosted publication metadata without changing discovery dates and preserves known dates when omitted',async()=>{
+ const {db}=fixture();let now=1000;let createdAt;
+ const make=()=>createCatalogService(db,schema,{defaults:[root],clock:()=>now++,inspect:async url=>jsonPage(url,{...dataset('birds'),createdAt})});
+ let service=make();let run=await service.startRun([],1,'discover');await service.stepRun(run.id);
+ const foundAt=(await service.catalog())[0].foundAt;createdAt='2020-06-01T12:00:00Z';
+ service=make();run=await service.startRun([],1,'refresh');await service.stepRun(run.id);
+ let row=(await service.catalog())[0];assert.equal(row.publicationDate,'2020-06-01');assert.equal(row.publicationDateBasis,'repository_created');assert.equal(row.foundAt,foundAt);
+ createdAt=undefined;run=await service.startRun([],1,'refresh');await service.stepRun(run.id);row=(await service.catalog())[0];assert.equal(row.publicationDate,'2020-06-01');assert.equal(row.foundAt,foundAt);
+});

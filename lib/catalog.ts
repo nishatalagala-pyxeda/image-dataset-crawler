@@ -1,8 +1,9 @@
+import {displayRecord} from './dataset-metadata.mjs';
 import {getDb} from '../db';
 import * as schema from '../db/schema';
 import {createCatalogService} from './crawl-service.mjs';
 const service=()=>createCatalogService(getDb(),schema);
-export const catalog=()=>service().catalog();
+export const catalog=async()=>(await service().catalog()).map(displayRecord);
 export const latestRun=()=>service().latestRun();
 export const discoveryStats=()=>service().discoveryStats();
 export const startRun=(urls:string[],limit=20,mode='discover')=>service().startRun(urls,limit,mode);
